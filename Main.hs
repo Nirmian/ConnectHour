@@ -102,15 +102,20 @@ game_loop board player = do
         get_winner player
         return ()
     else do
-        putStrLn "Game isn't over"
-        -- putStrLn $ int_to_char randomIndex
-        move <- getLine
-        randgen <- getStdGen
-        randomCol <- randomRIO (0,6 :: Int)
-        if(is_valid_move (read move :: Int) == True) then
-            game_loop (make_move board player (read move :: Int)) (playerTurn player)
-        else
-            game_loop board player
+        -- putStrLn "Game isn't over"       
+        if(player == Red) then do
+            move <- getLine
+            if(is_valid_move (read move :: Int) == True) then
+                game_loop (make_move board player (read move :: Int)) (playerTurn player)
+            else
+                game_loop board player
+        else do
+            randgen <- getStdGen
+            randomCol <- randomRIO (0,5 :: Int)
+            if(is_valid_move randomCol == True) then
+                game_loop (ai_move board player randomCol) (playerTurn player)
+            else
+                game_loop board player
 
 main :: IO()
 main = do 
