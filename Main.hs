@@ -201,8 +201,9 @@ start_minimax board (x:xs) depth player = if player == Yellow then
 
 minimax :: Board -> Int -> [Int] -> Int -> Player -> (Int, Int)
 minimax board col valid_moves 0 player =  if is_terminal_node board then
-                                            if is_win_move board Red then (-999999, col) 
-                                            else (999999, col)
+                                            if is_win_move board Yellow then (999999, col) 
+                                            else if is_win_move board Red then (-999999, col) 
+                                            else (0, col)
                                         else ((score_position board (n_lines 4 board) Yellow), col)
 minimax board col [x] depth Yellow = minimax (make_move board Yellow x) col (get_valid_moves (make_move board Yellow x) [0..6]) (depth - 1) Red                              
 minimax board col (x:xs) depth Yellow = max (minimax (make_move board Yellow x) col (get_valid_moves (make_move board Yellow x) [0..6]) (depth - 1) Red) 
