@@ -16,9 +16,9 @@ data Game = Game { gameBoard :: Board
 
 
 instance Show Cell where
-    show (Empty) = show "#"
-    show (Filled Red) = show "X"
-    show (Filled Yellow) = show "O"
+    show (Empty) = "#"
+    show (Filled Red) = "X"
+    show (Filled Yellow) = "O"
 
 rows :: Int
 columns :: Int
@@ -34,7 +34,7 @@ initialGame = Game { gameBoard = array indexRange $ zip (range indexRange) (cycl
 --unwords [String] -> String takes every element from the list and returns a String with spaces between them
 --unlines [String] -> String adds \n for every element from the list
 drawBoard :: Board -> String
-drawBoard board = unlines [unwords [show (board ! (x, y)) | y <- [0..columns - 1] ] | x <- [0..rows - 1]] ++ " 0   1   2   3   4   5   6"
+drawBoard board = unlines [unwords [show (board ! (x, y)) | y <- [0..columns - 1] ] | x <- [0..rows - 1]]  ++ "-------------\n0 1 2 3 4 5 6"
 
 is_column_free :: Board -> Int -> Bool
 is_column_free board column = (board) ! (0,column) == Empty
@@ -74,17 +74,17 @@ is_tie :: Board -> Bool
 is_tie board = if(count_elem Empty (elems board) == 0) then True
             else False
 
-is_win_move :: Board -> Cell -> Bool
-is_win_move board piece = if win_moves board piece (n_lines' 4 board) /= [] then True
+is_win_move :: Board -> Player -> Bool
+is_win_move board player = if (filter (\x -> x == Filled player) (map full $ n_lines 4 board) /= []) then True
                         else False
 
-win_moves :: Board -> Cell -> [[(Int, Int)]] -> [(Int, Int)]
-win_moves board piece [] = error "empty list"
-win_moves board piece [x] = if (get_filled_tuples board piece x == 3) then get_empty_tuples board x 
-                            else []
-win_moves board piece (x:xs) = if (get_filled_tuples board piece x == 3) then 
-                                    get_empty_tuples board x ++ win_moves board piece xs
-                                else win_moves board piece xs
+-- win_moves :: Board -> Cell -> [[(Int, Int)]] -> [(Int, Int)]
+-- win_moves board piece [] = error "empty list"
+-- win_moves board piece [x] = if (get_filled_tuples board piece x == 3) then get_empty_tuples board x 
+--                             else []
+-- win_moves board piece (x:xs) = if (get_filled_tuples board piece x == 3) then 
+--                                     get_empty_tuples board x ++ win_moves board piece xs
+--                                 else win_moves board piece xs
 
 get_filled_tuples :: Board -> Cell -> [(Int, Int)] -> Int
 get_filled_tuples board cell [] = error "empty list"
@@ -163,11 +163,6 @@ count_elem :: Eq a => a -> [a] -> Int
 count_elem _ [] = 0
 count_elem x list = sum $ map (\a -> 1) $ filter (== x) list
 
-line_frequency :: (Eq a, Eq b) => b -> [((a, a), b)] -> Int
-line_frequency _ [] = 0
-line_frequency x list = sum $ map (\((_, _), b) -> 1) $ filter condition list
-    where condition (_, cell) = (cell == x)
-
 eval_line :: [Cell] -> Cell -> Int
 eval_line line piece = if count_elem piece line == 4 then 100
                         else if count_elem piece line == 3 && count_elem Empty line == 1 then 5
@@ -179,33 +174,49 @@ score_position :: Board -> [[Cell]] -> Player -> Int
 score_position board [x] player = (eval_line x (Filled player)) + (count_elem (Filled player) (center_line board)) * 3
 score_position board (x:xs) player = eval_line x (Filled player) + score_position board xs player
 
--- doesn't work properly. Recursion doesn't check score properly
-pick_best_move :: Board -> Player -> [Int] -> Int -> Int
+get_valid_moves :: Board -> [Int] -> [Int]
+get_valid_moves board [x] = if (is_column_free board x) then [x]
+                            else []
+get_valid_moves board (x:xs) = if (is_column_free board x) then [x] ++ get_valid_moves board xs
+                                else get_valid_moves board xs
+
+pick_best_move :: Board -> Player -> [Int] -> Int
 pick_best_move board player [x] = x
 pick_best_move board player (x:xs) 
-    | score_position board (n_lines 4 (make_move board player x)) player > score_position board (n_lines 4 (make_move board player maxTail)) player = x
+    | score_position (make_move board player x) (n_lines 4 (make_move board player x)) player > score_position board (n_lines 4 (make_move board player maxTail)) player = x
     | otherwise = maxTail
     where maxTail = pick_best_move board player xs
 
 is_terminal_node :: Board -> Bool
-is_terminal_node board = is_win_move board (Filled Red) || is_win_move board (Filled Yellow) || is_tie board
+is_terminal_node board = is_win_move board Red || is_win_move board Yellow || is_tie board
 
--- minimax :: Board -> Int -> Player -> Int
--- minimax board depth maximizingPlayer = if (is_terminal_node board) then
---                                         if (is_win_move board (Filled Yellow)) then 999999
---                                         else if (is_win_move board (Filled Red)) then -999999
---                                         else 0
---                                     else score_position board (Yellow)
+start_minimax :: Board -> [Int] -> Int -> Player -> (Int, Int)
+start_minimax board [x] depth player = if player == Yellow then minimax (make_move board Yellow x) x (get_valid_moves (make_move board Yellow x) [0..6]) (depth - 1) Red 
+                                    else minimax (make_move board Red x) x (get_valid_moves (make_move board Red x) [0..6]) (depth - 1) Yellow
+start_minimax board (x:xs) depth player = if player == Yellow then
+                                            max (minimax (make_move board Yellow x) x (get_valid_moves (make_move board Yellow x) [0..6]) (depth - 1) Red) 
+                                                (start_minimax board xs depth Yellow)
+                                        else min (minimax (make_move board Red x) x (get_valid_moves (make_move board Red x) [0..6]) (depth - 1) Yellow) 
+                                                 (start_minimax board xs depth Red)
+
+minimax :: Board -> Int -> [Int] -> Int -> Player -> (Int, Int)
+minimax board col valid_moves 0 player =  if is_terminal_node board then
+                                            if is_win_move board Red then (-999999, col) 
+                                            else (999999, col)
+                                        else ((score_position board (n_lines 4 board) Yellow), col)
+minimax board col [x] depth Yellow = minimax (make_move board Yellow x) col (get_valid_moves (make_move board Yellow x) [0..6]) (depth - 1) Red                              
+minimax board col (x:xs) depth Yellow = max (minimax (make_move board Yellow x) col (get_valid_moves (make_move board Yellow x) [0..6]) (depth - 1) Red) 
+                                            (minimax board col xs depth Yellow)
+minimax board col [x] depth Red = minimax (make_move board Red x) col (get_valid_moves (make_move board Red x) [0..6]) (depth - 1) Yellow
+minimax board col (x:xs) depth Red = min (minimax (make_move board Red x) col (get_valid_moves (make_move board Red x) [0..6]) (depth - 1) Yellow) 
+                                    (minimax board col xs depth Red)
 
 ai_move :: Board -> Player -> Int -> Board
 ai_move board player column = make_move board player column
 
 game_loop :: Board -> Player -> IO()
 game_loop board player = do
-    putStrLn $ id (drawBoard board)
-    putStrLn $ show $ win_moves board (Filled Yellow) (n_lines' 4 board)
-    putStrLn $ show $ score_position board (n_lines 4 board) player
-    putStrLn $ show $ pick_best_move board Red [0,1,2,3,4,5,6]
+    putStrLn $ (drawBoard board)
 
     if (game_over board) then do
         putStrLn "Game over"
@@ -219,12 +230,13 @@ game_loop board player = do
         else do
             if(player == Red) then do
                 move <- getLine
-                if(is_valid_move (read move :: Int) == True) then
+                if(is_valid_move (read move :: Int) == True && is_column_free board (read move :: Int)) then
                     game_loop (make_move board player (read move :: Int)) (playerTurn player)
                 else
                     game_loop board player
             else do
-                let bestMove = pick_best_move board Yellow [0,1,2,3,4,5,6]
+                let bestMove = snd $ start_minimax board (get_valid_moves board [0..6]) 3 Yellow
+                -- let bestMove = pick_best_move board Yellow (get_valid_moves board [0..6])
                 -- randgen <- getStdGen
                 -- randomCol <- randomRIO (0,6 :: Int)
                 if(is_valid_move bestMove == True) then
