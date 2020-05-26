@@ -14,11 +14,11 @@ data Game = Game { gameBoard :: Board
                  , gameState :: State
                  } deriving (Eq, Show)
 
-
+-- Remove ANSI escape codes so the game prints properly on windows cmd/powershell
 instance Show Cell where
-    show (Empty) = "#"
-    show (Filled Red) = "X"
-    show (Filled Yellow) = "O"
+    show (Empty) = "\x1b[32m" ++ "#"
+    show (Filled Red) = "\x1b[31m" ++ "X"
+    show (Filled Yellow) = "\x1b[33m" ++ "O"
 
 rows :: Int
 columns :: Int
@@ -34,7 +34,7 @@ initialGame = Game { gameBoard = array indexRange $ zip (range indexRange) (cycl
 --unwords [String] -> String takes every element from the list and returns a String with spaces between them
 --unlines [String] -> String adds \n for every element from the list
 drawBoard :: Board -> String
-drawBoard board = unlines [unwords [show (board ! (x, y)) | y <- [0..columns - 1] ] | x <- [0..rows - 1]]  ++ "-------------\n0 1 2 3 4 5 6"
+drawBoard board = unlines [unwords [show (board ! (x, y)) | y <- [0..columns - 1] ] | x <- [0..rows - 1]]  ++ "\x1b[32m" ++ "-------------\n0 1 2 3 4 5 6"
 
 is_column_free :: Board -> Int -> Bool
 is_column_free board column = (board) ! (0,column) == Empty
@@ -201,8 +201,8 @@ start_minimax board (x:xs) depth player = if player == Yellow then
 
 minimax :: Board -> Int -> [Int] -> Int -> Player -> (Int, Int)
 minimax board col valid_moves 0 player =  if is_terminal_node board then
-                                            if is_win_move board Yellow then (999999, col) 
-                                            else if is_win_move board Red then (-999999, col) 
+                                            if is_win_move board Red then (-999999, col) 
+                                            else if is_win_move board Yellow then (999999, col) 
                                             else (0, col)
                                         else ((score_position board (n_lines 4 board) Yellow), col)
 minimax board col [x] depth Yellow = minimax (make_move board Yellow x) col (get_valid_moves (make_move board Yellow x) [0..6]) (depth - 1) Red                              
